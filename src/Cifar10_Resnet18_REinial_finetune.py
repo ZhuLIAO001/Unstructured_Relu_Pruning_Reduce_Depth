@@ -12,7 +12,7 @@ import wandb
 import os
 from torch.utils.data import DataLoader
 
-
+print('1')
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)
