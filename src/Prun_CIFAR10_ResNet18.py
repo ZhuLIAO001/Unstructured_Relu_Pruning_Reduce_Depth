@@ -17,12 +17,14 @@ import wandb
 import os
 from torch.utils.data import DataLoader
 
+
 # set random seed, make results reproduceable
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)
 np.random.seed(43)
 torch.use_deterministic_algorithms(True)
+
 
 # Device configuration
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
