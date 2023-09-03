@@ -1,3 +1,5 @@
+# Implement EGP for Resnet18 on TinyImagenet dataset.
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -15,25 +17,22 @@ import wandb
 import os
 from torch.utils.data import DataLoader
 
-
+# set random seeds, make results reproduceable
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)
 np.random.seed(43)
 torch.use_deterministic_algorithms(True)
 
+# Device configuration
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 device = torch.device('cuda:0')  # Device configuration
 
 
-# Hyper-parameters
+# project name on Wandb
 project_name = "ICIP_resnet18_TinyIma_baseEntropyExpoMagni_prun_" 
 
 
-# model_name = './pruned_SDD_TinyIMAGENET_ResNet' # name of saved dense model
-
-# path = '/models/SDD'
-# name_of_run = 'ResNet50_TinyIMAGENET_Prun_512'
 
 # Training parameters 
 epochs = 160
@@ -53,7 +52,6 @@ class Hook():
 		else:
 			self.hook = module.register_backward_hook(self.hook_fn)													 
 	def hook_fn(self, module, input, output):
-		# self.output = output
 		self.output = torch.mean(torch.stack(list(input), dim=0),dim=0)   
 	def close(self):
 		self.hook.remove()
@@ -125,7 +123,6 @@ def test_entropy(model, hooks):
 	total=0    
 	loss_fn=torch.nn.CrossEntropyLoss()
 
-
 	with torch.no_grad():
 
 		for data in tqdm(train_loader):
@@ -137,17 +134,13 @@ def test_entropy(model, hooks):
 			total += labels.size(0)
 			correct += predicted.eq(labels).sum().item()  
 
-
-			layers = 0
 			for key in hooks.keys():         # For different layers	
 
 				full_p_one = torch.heaviside(hooks[key].output , torch.tensor([0],dtype=torch.float32).to(device))
-				# print('full_p_one.shape',full_p_one.shape)
-				p_one = torch.mean(full_p_one, dim=0)      # p_one shape: [64,16,16]
-				state = hooks[key].output > 0                                        # state shape: [128,64,16,16]
-				state = state.reshape(state.shape[0], state.shape[1], -1)            # state shape: [128,64,256]        
-				state_sum = torch.mean(state*1.0 , dim=[0,2])                         # state_sum shape: [64]                       
-				# print('state_sum.shape',state_sum.shape)
+				p_one = torch.mean(full_p_one, dim=0)     
+				state = hooks[key].output > 0                                     
+				state = state.reshape(state.shape[0], state.shape[1], -1)                  
+				state_sum = torch.mean(state*1.0 , dim=[0,2])                                            
 				state_sum_num = torch.sum((state_sum!= 0) * (state_sum!= 1))
 				if state_sum_num != 0:
 					while len(p_one.shape) > 1:					
@@ -170,7 +163,7 @@ def test_entropy(model, hooks):
 
 
 
-DATA_DIR = '/home/ipp-9236/data/tiny-imagenet-200' # Original images come in shapes of [3,64,64]
+DATA_DIR = '/data/datasets/tiny-imagenet-200'                   # set your own dataset path
 
 # Define training and validation data paths
 TRAIN_DIR = os.path.join(DATA_DIR, 'train') 
@@ -201,7 +194,7 @@ test_loader = DataLoader(test_dataset,
 						  num_workers=8)
 
 
-
+#Modify Resnet model to let each Relu layer only activate one FC layer or Conv Layer
 from torchvision.models.resnet import BasicBlock
 from torchvision.models.resnet import ResNet
 
@@ -249,14 +242,6 @@ class ResNet_new(ResNet):
 
 model = ResNet_new(BasicBlock_new, [2, 2, 2, 2], num_classes=200)
 model.to(device)
-torch.save(model,'/home/ipp-9236/PYZhu/ICIP23/model/TinyImag_ResNet18_for_rewind')
-
-# model = resnet18()
-# # # # fc_features = model.fc.in_features
-# # # model.fc = nn.Linear(fc_features,100)
-
-
-
 
 hooks = {}
 for name, module in model.named_modules():
@@ -264,22 +249,18 @@ for name, module in model.named_modules():
 		hooks[name] = Hook(module)
 
 
-
 sparsity_curve=[]
 acc_curve=[]
 
 
-
-
 sparsity = 0
 sparsity_curve.append(sparsity)
-# acc_curve.append(40.38)
 
 name_of_run = 'sparsity_'+str(sparsity)
-# name_model = project_name+name_of_run
 name_model = name_of_run
 
-wandb.init(project=project_name, entity="zhu-liao")
+#wandb setting
+wandb.init(project=project_name, entity="YOUR ENEITY")                                                #set your own entity
 wandb.run.name = name_of_run
 wandb.config.epochs = epochs
 wandb.config.batch_size = batch_size
@@ -310,16 +291,12 @@ for epoch in range(1,epochs+1):
 		'lr':last_lr, 'global_sparsity':0})
 
 
-	# torch.save(model, '/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyMagni_prun/model/'+ 'check_point' + name_model)
-
-
-
 for name, module in model.named_modules():
 	if type(module) == torch.nn.ReLU:
 		hooks[name].hook.remove() 
 
 temp_model = copy.deepcopy(model)
-torch.save(temp_model, '/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyMagni_prun/model/'+ name_model)
+torch.save(temp_model, 'YOUR PATH'+ '/Resnet18_TinyImagi/baseEntropyMagni_prun/model/'+ name_model)                    #set your own path to save model
 
 acc_curve.append(final_testacc)
 
@@ -336,10 +313,10 @@ for i in range(1, 10):
 	print(sparsity)
 
 	name_of_run = 'sparsity_'+str(sparsity)
-	# name_model = project_name+name_of_run
 	name_model = name_of_run
 
-	wandb.init(project=project_name, entity="zhu-liao")
+	#wandb setting
+	wandb.init(project=project_name, entity="YOUR ENEITY")                                                       #set your own entity
 	wandb.run.name = name_of_run
 	wandb.config.epochs = epochs
 	wandb.config.batch_size = batch_size
@@ -364,9 +341,6 @@ for i in range(1, 10):
 			name = key.replace('relu', 'conv')
 			layers_to_prune.append(name)
   
-
-
-
 
 	test_entropy_acc, test_entropy_loss, layers_entropy = test_entropy(model,hooks)   #calculate the entropy for each layer
 
@@ -441,16 +415,11 @@ for i in range(1, 10):
 				
 		for name, module in model.named_modules():
 			if name in wait_distri_paras:
-
-
 				left_amount[name] = torch.numel(module.weight[module.weight!=0])
-
-
 				if left_amount[name] < fix_prun_amount[name]:
 					fix_prun_amount[name] = left_amount[name]
 					total_layers_weight_paras_to_prun -= left_amount[name]
-					total_layers_entro_magni -= layer_entro_magni[name]
-					
+					total_layers_entro_magni -= layer_entro_magni[name]					
 					wait_distri_paras.remove(name)
 					amout_changed = True
 
@@ -458,13 +427,9 @@ for i in range(1, 10):
 			break
 
 
-
-
-
 	for name, module in model.named_modules():
 		if name in layers_to_prune:
 			prune.l1_unstructured(module, name='weight', amount=int(fix_prun_amount[name]))
-
 
 	
 	true_sparsity_weights = []
@@ -487,7 +452,6 @@ for i in range(1, 10):
 	
 	scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
 
-
 	final_testacc = 0
 
 	for epoch in range(1,epochs+1):
@@ -502,7 +466,7 @@ for i in range(1, 10):
 			'lr':last_lr, 'global_sparsity':global_sparsity})
 		
 
-		torch.save(model, '/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/model/'+ 'check_point' + name_model)
+		torch.save(model, 'YOUR PATH'+ '/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/model/'+ 'check_point' + name_model)     # set your own path to save check point
 
 
 	temp_model = copy.deepcopy(model)
@@ -510,8 +474,8 @@ for i in range(1, 10):
 		if name in layers_to_prune:
 			prune.remove(module,'weight')
 
-	torch.save(temp_model, '/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/model/'+ name_model)		
-		
+	torch.save(temp_model, 'YOUR PATH'+ '/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/model/'+ name_model)		    #set your own path to save model
+
 
 
 	for name, module in model.named_modules():
@@ -540,6 +504,6 @@ for i in range(1, 10):
 	plt.ylabel("modle_acc", fontdict={'size': 16})
 	plt.title("Trade-off curve", fontdict={'size': 20})
 
-	plt.savefig('/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/Tradeoff_curve/'+'sparsity_acc_Tradeoff_curve_'+str(sparsity) + '.png')
+	plt.savefig('YOUR PATH'+ '/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/Tradeoff_curve/'+'sparsity_acc_Tradeoff_curve_'+str(sparsity) + '.pdf')           #set your own path to save trade-off figure
 
 

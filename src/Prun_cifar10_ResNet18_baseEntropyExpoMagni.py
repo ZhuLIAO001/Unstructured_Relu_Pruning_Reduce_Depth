@@ -17,7 +17,7 @@ import wandb
 import os
 from torch.utils.data import DataLoader
 
-# set random seed, make results reproduceable
+# set random seeds, make results reproduceable
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)

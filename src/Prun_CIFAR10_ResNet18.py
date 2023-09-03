@@ -18,7 +18,7 @@ import os
 from torch.utils.data import DataLoader
 
 
-# set random seed, make results reproduceable
+# set random seeds, make results reproduceable
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)
@@ -206,6 +206,7 @@ for i in range(1, 10):
 	name_of_run = '_sparsity_'+str(sparsity)
 	name_model = name_of_run
 
+	#wandb setting
 	wandb.init(project=project_name, entity="YOUR ENEITY")                                                       #set your own entity
 	wandb.run.name = name_of_run
 	wandb.config.epochs = epochs
