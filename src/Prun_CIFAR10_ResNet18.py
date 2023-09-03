@@ -1,3 +1,5 @@
+#  Traditional iterative pruning of Resnet18 on Cifar10 dataset.
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -15,25 +17,21 @@ import wandb
 import os
 from torch.utils.data import DataLoader
 
-
+# set random seed, make results reproduceable
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)
 np.random.seed(43)
 torch.use_deterministic_algorithms(True)
 
+# Device configuration
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
-device = torch.device('cuda:0')  # Device configuration
+device = torch.device('cuda:0')  
 
 
-# Hyper-parameters
+# project name on Wandb
 project_name = "ICIP_redo_resnet18_cifar10_baselineprun" 
 
-
-# model_name = './pruned_SDD_TinyIMAGENET_ResNet' # name of saved dense model
-
-# path = '/models/SDD'
-# name_of_run = 'ResNet50_TinyIMAGENET_Prun_512'
 
 # Training parameters 
 epochs = 160
@@ -134,18 +132,15 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
 
 
 # # load the modified model
-# from cifar10_models.resnet import resnet18
-# # untrained model
-# model = resnet18()
-# # fc_features = model.fc.in_features
-# # model.fc = nn.Linear(fc_features,100)
-# model.to(device)
+from cifar10_models.resnet import resnet18
+# untrained model
+model = resnet18()
+model.to(device)
 
-model= torch.load('/home/ipp-9236/PYZhu/ICIP23/Resnet18_cifar10/baseline_prun/model/_sparsity_0').to(device)
+
 
 sparsity_curve=[]
 acc_curve=[]
-
 
 
 
@@ -153,48 +148,49 @@ sparsity = 0
 sparsity_curve.append(sparsity)
 acc_curve.append(92.1)
 
-# name_of_run = '_sparsity_'+str(sparsity)
-# # name_model = project_name+name_of_run
-# name_model = name_of_run
+name_of_run = '_sparsity_'+str(sparsity)
 
-# wandb.init(project=project_name, entity="zhu-liao")
-# wandb.run.name = name_of_run
-# wandb.config.epochs = epochs
-# wandb.config.batch_size = batch_size
-# wandb.config.learning_rate = learning_rate
-# wandb.config.weight_decay = weight_decay
-# wandb.config.gamma = gamma
-# wandb.config.milestones = milestones
-# wandb.config.momentum = momentum
-# wandb.config.sparsity = sparsity
+name_model = name_of_run
 
-
-# optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-# loss_fn=nn.CrossEntropyLoss().to(device)
-
-# scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
-
-# final_testacc = 0
-
-# for epoch in range(1,epochs+1):
-# 	train_acc, train_loss = train(model, epoch, optimizer)
-# 	test_acc, test_loss = test(model, epoch)
-# 	final_testacc = test_acc
-# 	last_lr=scheduler.get_last_lr()[-1]
-# 	scheduler.step()
-# 	wandb.log(
-# 		{"train_acc": train_acc, "train_loss": train_loss,
-# 		"test_acc": test_acc, "test_loss": test_loss, 
-# 		'lr':last_lr, 'global_sparsity':0})
+#wandb setting
+wandb.init(project=project_name, entity="YOUR ENEITY")                                                #set your own entity
+wandb.run.name = name_of_run
+wandb.config.epochs = epochs
+wandb.config.batch_size = batch_size
+wandb.config.learning_rate = learning_rate
+wandb.config.weight_decay = weight_decay
+wandb.config.gamma = gamma
+wandb.config.milestones = milestones
+wandb.config.momentum = momentum
+wandb.config.sparsity = sparsity
 
 
-# 	temp_model = copy.deepcopy(model)
-# 	torch.save(temp_model, '/home/ipp-9236/PYZhu/ICIP23/Resnet18_cifar10/baseline_prun/model/'+ name_model)
+optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+loss_fn=nn.CrossEntropyLoss().to(device)
 
-# acc_curve.append(final_testacc)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+
+final_testacc = 0
+
+for epoch in range(1,epochs+1):
+	train_acc, train_loss = train(model, epoch, optimizer)
+	test_acc, test_loss = test(model, epoch)
+	final_testacc = test_acc
+	last_lr=scheduler.get_last_lr()[-1]
+	scheduler.step()
+	wandb.log(
+		{"train_acc": train_acc, "train_loss": train_loss,
+		"test_acc": test_acc, "test_loss": test_loss, 
+		'lr':last_lr, 'global_sparsity':0})
 
 
-# wandb.finish()
+	temp_model = copy.deepcopy(model)
+	torch.save(temp_model, 'YOUR PATH'+ '/Resnet18_cifar10/baseline_prun/model/'+ name_model)                   #set your own path to save model
+
+acc_curve.append(final_testacc)
+
+
+wandb.finish()
 
 
 
@@ -206,10 +202,9 @@ for i in range(1, 10):
 	sparsity_curve.append(sparsity)
 
 	name_of_run = '_sparsity_'+str(sparsity)
-	# name_model = project_name+name_of_run
 	name_model = name_of_run
 
-	wandb.init(project=project_name, entity="zhu-liao")
+	wandb.init(project=project_name, entity="YOUR ENEITY")                                                       #set your own entity
 	wandb.run.name = name_of_run
 	wandb.config.epochs = epochs
 	wandb.config.batch_size = batch_size
@@ -254,7 +249,7 @@ for i in range(1, 10):
 		for temp_module in filter(lambda m: type(m) == torch.nn.Conv2d or type(m) == torch.nn.Linear, temp_model.modules()):
 			prune.remove(temp_module,'weight')
 
-		torch.save(temp_model, '/home/ipp-9236/PYZhu/ICIP23/Resnet18_cifar10/baseline_prun/model/'+ name_model)
+		torch.save(temp_model, 'YOUR PATH'+ '/Resnet18_cifar10/baseline_prun/model/'+ name_model)               #set your own path to save model
 
 	acc_curve.append(final_testacc)
 
@@ -272,7 +267,7 @@ for i in range(1, 10):
 	plt.xlabel("Parameters Pruned away", fontdict={'size': 16})
 	plt.ylabel("modle_acc", fontdict={'size': 16})
 	plt.title("Trade-off curve", fontdict={'size': 20})
-	plt.savefig('/home/ipp-9236/PYZhu/ICIP23/Resnet18_cifar10/baseline_prun/tradeoff_fig/'+'sparsity_acc_Tradeoff_curve_'+str(sparsity) + '.png')
+	plt.savefig('YOUR PATH'+ '/Resnet18_cifar10/baseline_prun/tradeoff_fig/'+'sparsity_acc_Tradeoff_curve_'+str(sparsity) + '.pdf')  #set your own path to save trade-off figure
 
 
 
