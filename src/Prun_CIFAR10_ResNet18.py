@@ -249,7 +249,7 @@ for i in range(1, 10):
 		for temp_module in filter(lambda m: type(m) == torch.nn.Conv2d or type(m) == torch.nn.Linear, temp_model.modules()):
 			prune.remove(temp_module,'weight')
 
-		torch.save(temp_model, 'YOUR PATH'+ '/Resnet18_cifar10/baseline_prun/model/'+ name_model)               #set your own path to save model
+		torch.save(temp_model, 'YOUR PATH'+ '/Resnet18_cifar10/baseline_prun/model/'+ name_model)              #set your own path to save model
 
 	acc_curve.append(final_testacc)
 
@@ -267,7 +267,7 @@ for i in range(1, 10):
 	plt.xlabel("Parameters Pruned away", fontdict={'size': 16})
 	plt.ylabel("modle_acc", fontdict={'size': 16})
 	plt.title("Trade-off curve", fontdict={'size': 20})
-	plt.savefig('YOUR PATH'+ '/Resnet18_cifar10/baseline_prun/tradeoff_fig/'+'sparsity_acc_Tradeoff_curve_'+str(sparsity) + '.pdf')     #set your own path to save trade-off figure
+	plt.savefig('YOUR PATH'+ '/Resnet18_cifar10/baseline_prun/tradeoff_fig/'+'sparsity_acc_Tradeoff_curve_'+str(sparsity) + '.pdf')    #set your own path to save trade-off figure
 
 
 
