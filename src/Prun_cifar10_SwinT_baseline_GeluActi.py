@@ -1,11 +1,11 @@
+#  Traditional iterative pruning of Swin-T (only prun GeLU activated layers) on Cifar10 dataset.
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
-import torchvision.models as models
 from torch import nn
 from torch import optim
 import torch.nn.utils.prune as prune
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -15,27 +15,21 @@ import wandb
 import os
 from torch.utils.data import DataLoader
 
-
+# set random seeds, make results reproduceable
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)
 np.random.seed(43)
 torch.use_deterministic_algorithms(True)
 
+# Device configuration
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
-device = torch.device('cuda:0')  # Device configuration
+device = torch.device('cuda:0')  
 
 
-# Hyper-parameters
+# project name on Wandb
 project_name = "ICIP_SwinT_cifar10_baseline_prun_GeluActi" 
-# project_name = "ICIP_text_" 
 
-
-
-# model_name = './pruned_SDD_TinyIMAGENET_ResNet' # name of saved dense model
-
-# path = '/models/SDD'
-# name_of_run = 'ResNet50_TinyIMAGENET_Prun_512'
 
 # Training parameters 
 epochs = 160
@@ -138,17 +132,13 @@ def test_entropy(model, hooks):
 			total += labels.size(0)
 			correct += predicted.eq(labels).sum().item()  
 
-
-			layers = 0
 			for key in hooks.keys():         # For different layers	
 
 				full_p_one = torch.heaviside(hooks[key].output , torch.tensor([0],dtype=torch.float32).to(device))
-				# print('full_p_one.shape',full_p_one.shape)
-				p_one = torch.mean(full_p_one, dim=0)      # p_one shape: [64,16,16]
-				state = hooks[key].output > 0                                        # state shape: [128,64,16,16]
-				state = state.reshape(state.shape[0], state.shape[1], -1)            # state shape: [128,64,256]        
-				state_sum = torch.mean(state*1.0 , dim=[0,2])                         # state_sum shape: [64]
-				# print('state_sum.shape',state_sum.shape)
+				p_one = torch.mean(full_p_one, dim=0)      
+				state = hooks[key].output > 0                                       
+				state = state.reshape(state.shape[0], state.shape[1], -1)                  
+				state_sum = torch.mean(state*1.0 , dim=[0,2])                        
 				state_sum_num = torch.sum((state_sum!= 0) * (state_sum!= 1))
 				if state_sum_num != 0:
 					while len(p_one.shape) > 1:					
@@ -165,7 +155,6 @@ def test_entropy(model, hooks):
 	test_loss=running_loss/len(train_loader)
 	accu=100.*correct/total
 	
-
 	print('Test Loss: %.3f | Accuracy: %.3f'%(test_loss,accu))
 	return(accu, test_loss, layers_entropy)
 
@@ -204,12 +193,10 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
 
 
 
-# model = torchvision.models.swin_t( weights = True)
-# model.head = torch.nn.Linear(in_features=model.head.in_features, out_features=10)
-# model.to(device)
+model = torchvision.models.swin_t( weights = True)
+model.head = torch.nn.Linear(in_features=model.head.in_features, out_features=10)
+model.to(device)
 
-
-model= torch.load('/home/ipp-9236/PYZhu/ICIP23/SwinT_cifar10/baseline_GeluActivated/model/check_point/check_point_sparsity_0.875').to(device)
 
 
 hooks = {}
@@ -223,65 +210,63 @@ sparsity_curve=[]
 acc_curve=[]
 
 
-
 sparsity = 0
 sparsity_curve.append(sparsity)
 
-test_acc, test_loss = test(model, 1)
-acc_curve.append(test_acc)
-# name_of_run = 'sparsity_'+str(sparsity)
-# name_model = name_of_run
+name_of_run = 'sparsity_'+str(sparsity)
+name_model = name_of_run
 
-# wandb.init(project=project_name, entity="zhu-liao")
-# wandb.run.name = name_of_run
-# wandb.config.epochs = epochs
-# wandb.config.batch_size = batch_size
-# wandb.config.learning_rate = learning_rate
-# wandb.config.weight_decay = weight_decay
-# wandb.config.gamma = gamma
-# wandb.config.milestones = milestones
-# wandb.config.momentum = momentum
-# wandb.config.sparsity = sparsity
-
-
-# optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-# loss_fn=nn.CrossEntropyLoss().to(device)
-
-# scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
-
-# final_testacc = 0
-
-# for epoch in range(1,epochs+1):
-# 	train_acc, train_loss = train(model, epoch, optimizer)
-# 	test_acc, test_loss = test(model, epoch)
-# 	final_testacc = test_acc
-# 	last_lr=scheduler.get_last_lr()[-1]
-# 	scheduler.step()
-# 	wandb.log(
-# 		{"train_acc": train_acc, "train_loss": train_loss,
-# 		"test_acc": test_acc, "test_loss": test_loss, 
-# 		'lr':last_lr, 'global_sparsity':0})
+#wandb setting
+wandb.init(project=project_name, entity="YOUR ENEITY")                                                #set your own entity
+wandb.run.name = name_of_run
+wandb.config.epochs = epochs
+wandb.config.batch_size = batch_size
+wandb.config.learning_rate = learning_rate
+wandb.config.weight_decay = weight_decay
+wandb.config.gamma = gamma
+wandb.config.milestones = milestones
+wandb.config.momentum = momentum
+wandb.config.sparsity = sparsity
 
 
-# 	temp_model = copy.deepcopy(model)
-# 	torch.save(temp_model, '/home/ipp-9236/PYZhu/ICIP23/SwinT_cifar10/baseline_GeluActivated/model/model_save/'+ name_model)
+optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+loss_fn=nn.CrossEntropyLoss().to(device)
 
-# acc_curve.append(final_testacc)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+
+final_testacc = 0
+
+for epoch in range(1,epochs+1):
+	train_acc, train_loss = train(model, epoch, optimizer)
+	test_acc, test_loss = test(model, epoch)
+	final_testacc = test_acc
+	last_lr=scheduler.get_last_lr()[-1]
+	scheduler.step()
+	wandb.log(
+		{"train_acc": train_acc, "train_loss": train_loss,
+		"test_acc": test_acc, "test_loss": test_loss, 
+		'lr':last_lr, 'global_sparsity':0})
 
 
-# wandb.finish()
+	temp_model = copy.deepcopy(model)
+	torch.save(temp_model, 'YOUR PATH'+ '/SwinT_cifar10/baseline_GeluActivated/model/model_save/'+ name_model)                   #set your own path to save model
+
+acc_curve.append(final_testacc)
+
+wandb.finish()
 
 
 
 
-for i in range(4, 10):
+for i in range(1, 10):
 	sparsity = 1-(1-fixed_amount_of_pruning)**i
 	sparsity_curve.append(sparsity)
 
 	name_of_run = 'sparsity_'+str(sparsity)
 	name_model = name_of_run
 
-	wandb.init(project=project_name, entity="zhu-liao")
+	#wandb setting
+	wandb.init(project=project_name, entity="YOUR ENEITY")                                                       #set your own entity
 	wandb.run.name = name_of_run
 	wandb.config.epochs = epochs
 	wandb.config.batch_size = batch_size
@@ -314,11 +299,6 @@ for i in range(4, 10):
 
 	torch.nn.utils.prune.global_unstructured(prune_list, pruning_method=torch.nn.utils.prune.L1Unstructured, amount=fixed_amount_of_pruning)
 	
-
-	# for name, module in model.named_modules():
-	# 	if name in layers_to_prune:
-	# 		prune.l1_unstructured(module, name='weight', amount=int(fix_prun_amount[name]))
-
 	
 	true_sparsity_weights = []
 	zero_weight = 0
@@ -328,8 +308,6 @@ for i in range(4, 10):
 			true_sparsity_weights.append(torch.numel(module.weight[module.weight==0])/torch.numel(module.weight))
 			zero_weight += torch.numel(module.weight[module.weight==0])
 			whole_weight += torch.numel(module.weight)
-			# print(name)
-			# print(torch.numel(module.weight[module.weight==0]))
 
 	wandb.config.True_sparsity_weights = true_sparsity_weights
 
@@ -337,28 +315,22 @@ for i in range(4, 10):
 
 
 	optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-	loss_fn=nn.CrossEntropyLoss().to(device)
-	
+	loss_fn=nn.CrossEntropyLoss().to(device)	
 	scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
 
-
 	final_testacc = 0
-
 	for epoch in range(1,epochs+1):
 		train_acc, train_loss = train(model, epoch,optimizer)
 		test_acc, test_loss = test(model, epoch)
 		final_testacc = test_acc
 		last_lr=scheduler.get_last_lr()[-1]
 		scheduler.step()
-		#wandb.watch(model)
 		wandb.log(
 			{"train_acc": train_acc, "train_loss": train_loss,
 			"test_acc": test_acc, "test_loss": test_loss, 
 			'lr':last_lr, 'global_sparsity':global_sparsity})
-		
 
-
-		torch.save(model, '/home/ipp-9236/PYZhu/ICIP23/SwinT_cifar10/baseline_GeluActivated/model/check_point/'+'check_point_'+ name_model)
+		torch.save(model, 'YOUR PATH'+ '/SwinT_cifar10/baseline_GeluActivated/model/check_point/'+'check_point_'+ name_model)               #set your own path to save check point
 
 
 	
@@ -369,7 +341,7 @@ for i in range(4, 10):
 		if name in layers_to_prune:
 			prune.remove(module,'weight')
 
-	torch.save(temp_model, '/home/ipp-9236/PYZhu/ICIP23/SwinT_cifar10/baseline_GeluActivated/model/model_save/'+ name_model)
+	torch.save(temp_model, 'YOUR PATH'+ '/SwinT_cifar10/baseline_GeluActivated/model/model_save/'+ name_model)            #set your own path to save check point
 
 	wandb.finish()
 
@@ -383,7 +355,6 @@ for i in range(4, 10):
 		plt.text(sparsity_curve[i], acc_curve[i], round(acc_curve[i],2), fontdict={'size': 15})
 	plt.scatter(sparsity_curve, acc_curve, c='red')
 
-
 	plt.grid(True, linestyle='--', alpha=0.5)
 
 	plt.xlabel(r"Sparsity $\zeta$", fontdict={'size': 30})
@@ -393,6 +364,6 @@ for i in range(4, 10):
 
 
 
-	plt.savefig('/home/ipp-9236/PYZhu/ICIP23/SwinT_cifar10/baseline_GeluActivated/Tradeoff_curve/'+' sparsity_acc_Tradeoff_curve_'+str(sparsity) + '.png')
+	plt.savefig('YOUR PATH'+ '/SwinT_cifar10/baseline_GeluActivated/Tradeoff_curve/'+' sparsity_acc_Tradeoff_curve_'+str(sparsity) + '.pdf')                #set your own path to save trade-off figure
 	# plt.show()
 
