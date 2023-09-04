@@ -1,7 +1,8 @@
+# We reinitialize EGP model (Resnet18 on Cifar10) and finetune it. To see can we successfully train from scratch a shallower model, without resorting to an iterative strategy?
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
-import torchvision.models as models
 from torch import nn
 from torch import optim
 import numpy as np
@@ -10,29 +11,24 @@ import copy
 import random
 import wandb
 import os
-from torch.utils.data import DataLoader
 
 
+# set random seeds, make results reproduceable
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)
 np.random.seed(43)
 torch.use_deterministic_algorithms(True)
 
+# Device configuration
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
-device = torch.device('cuda:0')  # Device configuration
+device = torch.device('cuda:0')  
 
 
-# Hyper-parameters
+# project name on Wandb
 project_name = "ICIP_Resnet18_Cifar10_ReInit" 
-# project_name = "ICIP_text_" 
 
 
-
-# model_name = './pruned_SDD_TinyIMAGENET_ResNet' # name of saved dense model
-
-# path = '/models/SDD'
-# name_of_run = 'ResNet50_TinyIMAGENET_Prun_512'
 
 # Training parameters 
 epochs = 160
@@ -146,7 +142,7 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
 
 
 
-model= torch.load('/home/ipp-9236/PYZhu/ICIP23/Resnet18_cifar10/baseEntropyExpoMagni_prun/model/sparsity_0.99609375').to(device)
+model= torch.load('YOUR PATH' + '/Resnet18_cifar10/baseEntropyExpoMagni_prun/model/sparsity_0.99609375').to(device)                #Your path where save the EGP model
 
 
 hooks = {}
@@ -161,13 +157,11 @@ sparsity_curve=[]
 acc_curve=[]
 
 
-
 sparsity = 0.9375
-# sparsity_curve.append(sparsity)
 
 
 
-
+# Reinilize the shallower model
 for name, module in list(model.named_modules()):
 	if type(module) == torch.nn.Conv2d or type(module) == torch.nn.Linear:
 		if torch.numel(torch.abs(module.weight)[module.weight != 0])==0:
@@ -181,17 +175,13 @@ for name, module in list(model.named_modules()):
 
 
 
-# for name, module in list(model.named_modules()):
-# 	if type(module) == torch.nn.Conv2d or type(module) == torch.nn.Linear:
-# 		if torch.numel(torch.abs(module.weight)[module.weight != 0])==0:
-# 			for param in module.parameters():
-# 				param.requires_grad = False
 
-
+#Finetune the reinitilized model
 name_of_run = 'sparsity_'+str(0.996)
 name_model = name_of_run
 
-wandb.init(project=project_name, entity="zhu-liao")
+#wandb setting
+wandb.init(project=project_name, entity="YOUR ENEITY")                                                #set your own entity
 wandb.run.name = name_of_run
 wandb.config.epochs = epochs
 wandb.config.batch_size = batch_size
@@ -223,7 +213,7 @@ for epoch in range(1,epochs+1):
 
 
 	temp_model = copy.deepcopy(model)
-	torch.save(temp_model, '/home/ipp-9236/PYZhu/ICIP23/Resnet18_cifar10/baseEntropyExpoMagni_prun/ReInitialize/model/'+ name_model)
+	torch.save(temp_model, 'YOUR PATH'+ '/Resnet18_cifar10/baseEntropyExpoMagni_prun/ReInitialize/model/'+ name_model)	   	    #set your own path to save the finetuned model
 
 acc_curve.append(final_testacc)
 

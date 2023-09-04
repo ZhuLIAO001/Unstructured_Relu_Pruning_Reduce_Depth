@@ -1,3 +1,5 @@
+# We reinitialize EGP model (SwinT on TinyImagenet) and finetune it. To see can we successfully train from scratch a shallower model, without resorting to an iterative strategy?
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -12,27 +14,22 @@ import wandb
 import os
 from torch.utils.data import DataLoader
 
-
+# set random seeds, make results reproduceable
 torch.manual_seed(43)
 os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 random.seed(43)
 np.random.seed(43)
 torch.use_deterministic_algorithms(True)
 
+# Device configuration
 os.environ["CUDA_VISIBLE_DEVICES"]="4"
 device = torch.device('cuda:0')  # Device configuration
 
 
-# Hyper-parameters
+# project name on Wandb
 project_name = "ICIP_SwinT_TinyImag_ReInit" 
-# project_name = "ICIP_text_" 
 
 
-
-# model_name = './pruned_SDD_TinyIMAGENET_ResNet' # name of saved dense model
-
-# path = '/models/SDD'
-# name_of_run = 'ResNet50_TinyIMAGENET_Prun_512'
 
 # Training parameters 
 epochs = 160
@@ -56,34 +53,6 @@ class Hook():
 		self.output = torch.mean(torch.stack(list(input), dim=0),dim=0)   
 	def close(self):
 		self.hook.remove()
-
-# def train(model, epoch, optimizer):
-# 	print('\nEpoch : %d'%epoch)    
-# 	model.train()
-	
-# 	running_loss=0
-# 	correct=0
-# 	total=0    
-# 	loss_fn=torch.nn.CrossEntropyLoss()
-# 	for data in tqdm(train_loader):       
-# 		inputs,labels=data[0].to(device),data[1].to(device)        
-# 		outputs=model(inputs)       
-# 		loss=loss_fn(outputs,labels)       
-# 		optimizer.zero_grad()
-# 		loss.backward(retain_graph=True)
-# 		print('train loss:', loss)
-# 		optimizer.step()     
-# 		running_loss += loss.item()        
-# 		_, predicted = outputs.max(1)
-# 		total += labels.size(0)
-# 		correct += predicted.eq(labels).sum().item()
-		
-# 	train_loss=running_loss/len(train_loader)
-# 	accu=100.*correct/total
-		
-# 	print('Train Loss: %.3f | Accuracy: %.3f'%(train_loss,accu))
-# 	return(accu, train_loss)
-
 
 
 def train(model, epoch, optimizer):
@@ -115,8 +84,6 @@ def train(model, epoch, optimizer):
 
 
 
-
-
 def test(model, epoch):
 	model.eval()
 	
@@ -143,8 +110,7 @@ def test(model, epoch):
 
 
 
-
-DATA_DIR = '/data/datasets/tiny-imagenet-200' # Original images come in shapes of [3,64,64]
+DATA_DIR = '/data/datasets/tiny-imagenet-200'                                # set your own dataset path
 
 # Define training and validation data paths
 TRAIN_DIR = os.path.join(DATA_DIR, 'train') 
@@ -176,12 +142,7 @@ test_loader = DataLoader(test_dataset,
 
 
 
-# model = torchvision.models.swin_t( weights = True)
-# model.head = torch.nn.Linear(in_features=model.head.in_features, out_features=10)
-# model.to(device)
-
-
-model= torch.load('/home/ids/ipp-9236/PYZhu/ICIP23/SwinT_TinyImagi/baseEntropyExpoMagni_prun/model/model_save/sparsity_0.5').to(device)
+model= torch.load('YOUR PATH' + '/SwinT_TinyImagi/baseEntropyExpoMagni_prun/model/model_save/sparsity_0.5').to(device)              #Your path where save the EGP model
 
 
 hooks = {}
@@ -201,7 +162,7 @@ sparsity_curve.append(sparsity)
 
 
 
-
+# Reinilize the shallower model
 for name, module in list(model.named_modules()):
 	if type(module) == torch.nn.Conv2d or type(module) == torch.nn.Linear:
 		if torch.numel(torch.abs(module.weight)[module.weight != 0])==0:
@@ -216,19 +177,12 @@ for name, module in list(model.named_modules()):
 
 
 
-
-
-# for name, module in list(model.named_modules()):
-# 	if type(module) == torch.nn.Conv2d or type(module) == torch.nn.Linear:
-# 		if torch.numel(torch.abs(module.weight)[module.weight != 0])==0:
-# 			for param in module.parameters():
-# 				param.requires_grad = False
-
-
+# Reinilize the shallower model
 name_of_run = 'sparsity_'+str(0.5)
 name_model = name_of_run
 
-wandb.init(project=project_name, entity="zhu-liao")
+#wandb setting
+wandb.init(project=project_name, entity="YOUR ENEITY")                                                #set your own entity
 wandb.run.name = name_of_run
 wandb.config.epochs = epochs
 wandb.config.batch_size = batch_size
@@ -242,7 +196,6 @@ wandb.config.sparsity = sparsity
 
 optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
 loss_fn=nn.CrossEntropyLoss().to(device)
-
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
 
 final_testacc = 0
@@ -260,7 +213,7 @@ for epoch in range(1,epochs+1):
 
 
 	temp_model = copy.deepcopy(model)
-	torch.save(temp_model, '/home/ids/ipp-9236/PYZhu/ICIP23/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/model/'+ name_model)
+	torch.save(temp_model, 'YOUR PATH' + '/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/model/'+ name_model)	   	    #set your own path to save the finetuned model
 
 acc_curve.append(final_testacc)
 
