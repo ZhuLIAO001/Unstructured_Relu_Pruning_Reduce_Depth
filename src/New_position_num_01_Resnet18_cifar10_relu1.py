@@ -1,111 +1,55 @@
-
+#For Resnet18 model on Cifar10, calculate the entropy of relu or identity layers' input, and generate the histogram
 
 import numpy as np
 import math
 import torch
 import torchvision
 import torch.nn.utils.prune
-#from pytorchcv.model_provider import get_model as ptcv_get_model # model
 import matplotlib.pyplot as plt
-from torch import nn
 from torchvision import transforms
-import wandb
 from tqdm import tqdm
 from torchvision.models import resnet18
-import glob
 import os
-from matplotlib import scale as mscale
-from matplotlib import transforms as mtransforms
 import math
-import matplotlib.ticker
 from copy import deepcopy
-from torch.utils.data import DataLoader
 
-## Choose device
-os.environ["CUDA_VISIBLE_DEVICES"]="2"
+# Choose device
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 device = torch.device("cuda:0")
 
 
 
 ###########################################
-# TinyImagenet dataset
-num_classes = 200
-batch_size = 200
+# CIFAR-10 dataset
+num_classes = 10
+batch_size = 128
 
-DATA_DIR = '/home/ipp-9236/data/tiny-imagenet-200' # Original images come in shapes of [3,64,64]
+transform = transforms.Compose([
+	transforms.ToTensor(),
+	transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
-# Define training and validation data paths
-TRAIN_DIR = os.path.join(DATA_DIR, 'train') 
-VALID_DIR = os.path.join(DATA_DIR, 'val')
+train_dataset = torchvision.datasets.CIFAR10(root='~/data/cifar-10/',
+											train=True, 
+											transform=transform,
+											download=True)
+test_dataset = torchvision.datasets.CIFAR10(root='~/data/cifar-10/',
+											train=False, 
+											transform=transform,
+											download=True)
 
-# Define transformation sequence for image pre-processing
-transform_train = transforms.Compose([
-									  transforms.RandomHorizontalFlip(),
-									  transforms.ToTensor(),
-									  transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+## Dataloaders
+train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
+										batch_size=batch_size, 
+										shuffle=True,
+										num_workers=8)
 
-transform_test = transforms.Compose([
-									 transforms.ToTensor(),
-									 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-
-train_dataset = torchvision.datasets.ImageFolder(TRAIN_DIR, transform=transform_train)
-
-train_loader = DataLoader(train_dataset,
-						  batch_size=batch_size, 
-						  shuffle=True, 
-						  num_workers=4)
-
-
-test_dataset = torchvision.datasets.ImageFolder(VALID_DIR, transform=transform_test)
-test_loader = DataLoader(test_dataset,
-						  batch_size=batch_size, 
-						  shuffle=False, 
-						  num_workers=4)
+test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
+										batch_size=batch_size, 
+										shuffle=True,
+										num_workers=8)
 
 
-from torchvision.models.resnet import BasicBlock
-from torchvision.models.resnet import ResNet
-
-class BasicBlock_new(BasicBlock):
-	def __init__(self, *args, **kwargs):
-		super(BasicBlock_new, self).__init__(*args, **kwargs)
-		self.relu1 = nn.ReLU(inplace=True)
-		self.relu2 = nn.ReLU(inplace=True)
-		delattr(self, 'relu')
-
-	def forward(self, x):
-		identity = x
-
-		out = self.conv1(x)
-		out = self.bn1(out)
-		out = self.relu1(out)
-
-		out = self.conv2(out)
-		out = self.bn2(out)
-
-		if self.downsample is not None:
-			identity = self.downsample(x)
-
-		out += identity
-		out = self.relu2(out)
-
-		return out
-
-class ResNet_new(ResNet):
-	def __init__(self, *args, **kwargs):
-		super(ResNet_new, self).__init__(*args, **kwargs)		
-		
-	def _replace_module(self, name, module):
-		modules = name.split('.')
-		curr_mod = self
-		
-		for mod_name in modules[:-1]:
-			curr_mod = getattr(curr_mod, mod_name)
-		
-		setattr(curr_mod, modules[-1], module)
-
-
-
+#Hook on relu layer
 class Hook():
 	def __init__(self, module, backward=False):
 		if backward==False:
@@ -117,6 +61,8 @@ class Hook():
 	def close(self):
 		self.hook.remove()
 
+
+#Hook on identity layer
 class Hook_Identity():
 	def __init__(self, module, backward=False):
 		if backward==False:
@@ -124,7 +70,6 @@ class Hook_Identity():
 		else:
 			self.hook = module.register_backward_hook(self.hook_fn)
 	def hook_fn(self, module, input, output):
-		# self.output = torch.heaviside(torch.mean(torch.stack(list(input), dim=0),dim=0) ,torch.tensor([0],dtype=torch.float32).to(device))
 		self.output =   torch.where(torch.mean(torch.stack(list(input), dim=0),dim=0)==0, 0, torch.ones_like(torch.mean(torch.stack(list(input), dim=0),dim=0))).to(device)
 	def close(self):
 		self.hook.remove()
@@ -159,8 +104,7 @@ def test(model):
 
 
 
-# g = os.walk(r'/home/ids/ipp-9236/PYZhu/NIPS23/VGG16_cifar10/RELU_modelntropy_lamda_sweep/lamda_0.1_1_counInfiEntro_doubleBeta10000/finetune_acti_to_linear_model/lamda0.1/layer_f42')                                     #load the models
-g = os.walk(r'/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/model') 
+g = os.walk(r'YOUR PATH' + '/Resnet18_cifar10/baseEntropyExpoMagni_prun/ReInitialize/model')                        #Your path where save the models
 layer_out_num = []
 
 for root, dir_list, file_list in g:
@@ -171,11 +115,9 @@ for root, dir_list, file_list in g:
 		results_layer = {}
 		num_filter_layer = {}
 		num_filter_each_layer = {}
-		target_model= torch.load('/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/model/'+file_name).to(device)          #load the models
-		# target_model= torch.load('/home/ipp-9236/PYZhu/NIPS/VGG16_cifar10/RELU_modelntropy_lamda_sweep/lamda_0.1_1_counInfiEntro_Tanh_doubleBeta100000_2phase/finetune_model/NIPS_VGG16_CIFAR10_relu_newentropy_lamda_sweep_countInfiEntropy_Tanh_finetune_doubleBeta100000_2phase_lamda1').to(device)  
+		target_model= torch.load('YOUR PATH' + '/Resnet18_cifar10/baseEntropyExpoMagni_prun/ReInitialize/model/'+file_name).to(device)          #Your path, load the models
 		l = 0
 		target_model.eval()
-		# print(target_model)
 
 
 		for name, module in target_model.named_modules():
@@ -239,7 +181,6 @@ for root, dir_list, file_list in g:
 					outputs=target_model(images)             	
 					for key in joint_activation_logger.keys():
 						p_one = torch.mean(hooks[key].output,dim=0)
-						# print(p_one.shape)                 	#([64, 16, 16])	
 						while len(p_one.shape) > 1:       			
 							p_one = torch.mean(p_one,dim=1)
 						for j in range(num_filter_layer[key]):
@@ -265,24 +206,21 @@ for root, dir_list, file_list in g:
 				layer_act_0_num.append(total_act_0)
 				layer_act_1_per.append(act_1_per) 
 				layer_act_1_num.append(total_act_1)
-				# print('layer_act_1_num',layer_act_1_num)
 				layer_act_mix_num.append(act_mix_num) 
 		
 		test_acc, test_loss = test(target_model)
 
 
 
-		# np.savez('/home/ids/ipp-9236/PYZhu/NIPS23/VGG16_cifar10/RELU_modelntropy_lamda_sweep/lamda_0.1_1_counInfiEntro_doubleBeta10000/finetune_prun_model/lamda0.1/para_per_num/para_position_01/' +'entropy_num_per'+file_name ,                 #save the parameters
-		# 			layer_name=layer_name, layer_act_0_per=layer_act_0_per, layer_act_1_per = layer_act_1_per, 
-		# 			layer_act_0_num = layer_act_0_num, layer_act_1_num=layer_act_1_num,layer_act_mix_num=layer_act_mix_num,entorpy0_position=entorpy0_position)
-
-		np.savez('/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/para_per_num/para_position_01/' +'entropy_num_per'+file_name ,                 
+		#save the entropy file
+		np.savez('YOUR PATH' + '/Resnet18_cifar10/baseEntropyExpoMagni_prun/ReInitialize/para_per_num/para_position_01/' +'entropy_num_per'+file_name ,           # set your own path to save the entropy file     
 					layer_name=layer_name, layer_act_0_per=layer_act_0_per, layer_act_1_per = layer_act_1_per, 
 					layer_act_0_num = layer_act_0_num, layer_act_1_num=layer_act_1_num,layer_act_mix_num=layer_act_mix_num,entorpy0_position=entorpy0_position)
 
 
 
 
+		#generate the histogram
 		fig = plt.figure(figsize= (20,10),dpi = 500)        
 
 		p1 = plt.bar(layer_name, layer_act_0_num, width=0.4, color='darkorange', label='Nonlinear')    
@@ -302,26 +240,8 @@ for root, dir_list, file_list in g:
 		plt.bar_label(p2, label_type='center')
 		plt.bar_label(p3, label_type='center')
 
-
-
-		# fig = plt.figure(figsize= (20,10),dpi = 500)        
-
-		# p1 = plt.bar(layer_name, layer_act_0_num, width=0.4, color='darkorange', label='Nonlinear')    
-		# p2 = plt.bar(layer_name, layer_act_1_num, width=0.4, color='indianred', bottom=layer_act_0_num, label='linear')
-		# p3 = plt.bar(layer_name, layer_act_mix_num, width=0.4, color='royalblue', bottom=list(np.add(layer_act_0_num,layer_act_1_num)), label='mix')        
-		# # plt.title('number of neurons always linear/nonlinear with acc:'+ str(test_acc))                                                  
-		# plt.legend() 
-
-		# plt.legend(['OFF (H=0)', 'ON (H=0)', r'${H} \neq 0$'], fontsize=40) 
-		# plt.grid(True, linestyle='--', alpha=0.5)
-		# plt.xlabel("Layer", fontsize=30)
-		# plt.ylabel("Neurons", fontsize=30)
-		# plt.xticks([])
-		# plt.yticks(size=20)
-
-
-
-		plt.savefig('/home/ipp-9236/PYZhu/ICIP23/Resnet18_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/para_per_num/fig/' +'entro_per_num'+file_name  + '.pdf')            # save the bar plots for resnet model
+		#save the histogram
+		plt.savefig('YOUR PATH' + '/Resnet18_cifar10/baseEntropyExpoMagni_prun/ReInitialize/para_per_num/fig/' +'entro_per_num'+file_name  + '.pdf')              # set your own path to save the histogram
 
 
 

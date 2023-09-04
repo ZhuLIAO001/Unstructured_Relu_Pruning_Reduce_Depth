@@ -1,24 +1,15 @@
-#calculate the entropy for relu1 (1st Conv2d layer inside each basic block) of resnet18 models
-
+#For Swin-T model on TinyImagenet, calculate the entropy of relu or identity layers' input, and generate the histogram
 
 import numpy as np
-import math
 import torch
 import torchvision
 import torch.nn.utils.prune
 #from pytorchcv.model_provider import get_model as ptcv_get_model # model
 import matplotlib.pyplot as plt
-from torch import nn
 from torchvision import transforms
-import wandb
 from tqdm import tqdm
 from torchvision.models import resnet18
-import glob
 import os
-from matplotlib import scale as mscale
-from matplotlib import transforms as mtransforms
-import math
-import matplotlib.ticker
 from copy import deepcopy
 from torch.utils.data import DataLoader
 
@@ -34,7 +25,7 @@ num_classes = 200
 
 
 
-DATA_DIR = '/data/datasets/tiny-imagenet-200' # Original images come in shapes of [3,64,64]
+DATA_DIR = '/data/datasets/tiny-imagenet-200'                                   # set your own dataset path
 
 # Define training and validation data paths
 TRAIN_DIR = os.path.join(DATA_DIR, 'train') 
@@ -65,7 +56,7 @@ test_loader = DataLoader(test_dataset,
 						  num_workers=8)
 
 
-
+#Hook on relu layer
 class Hook():
 	def __init__(self, module, backward=False):
 		if backward==False:
@@ -77,6 +68,7 @@ class Hook():
 	def close(self):
 		self.hook.remove()
 
+#Hook on identity layer
 class Hook_Identity():
 	def __init__(self, module, backward=False):
 		if backward==False:
@@ -84,7 +76,6 @@ class Hook_Identity():
 		else:
 			self.hook = module.register_backward_hook(self.hook_fn)
 	def hook_fn(self, module, input, output):
-		# self.output = torch.heaviside(torch.mean(torch.stack(list(input), dim=0),dim=0) ,torch.tensor([0],dtype=torch.float32).to(device))
 		self.output =   torch.where(torch.mean(torch.stack(list(input), dim=0),dim=0)==0, 0, torch.ones_like(torch.mean(torch.stack(list(input), dim=0),dim=0))).to(device)
 	def close(self):
 		self.hook.remove()
@@ -119,8 +110,7 @@ def test(model):
 
 
 
-# g = os.walk(r'/home/ids/ipp-9236/PYZhu/NIPS23/VGG16_cifar10/RELU_modelntropy_lamda_sweep/lamda_0.1_1_counInfiEntro_doubleBeta10000/finetune_acti_to_linear_model/lamda0.1/layer_f42')                                     #load the models
-g = os.walk(r'/home/ids/ipp-9236/PYZhu/ICIP23/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/model') 
+g = os.walk(r'YOUR PATH' + '/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/model')                                          #Your path where save the models          
 layer_out_num = []
 
 for root, dir_list, file_list in g:
@@ -131,12 +121,9 @@ for root, dir_list, file_list in g:
 		results_layer = {}
 		num_filter_layer = {}
 		num_filter_each_layer = {}
-		target_model= torch.load('/home/ids/ipp-9236/PYZhu/ICIP23/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/model/'+file_name).to(device)          #load the models
-		# target_model= torch.load('/home/ids/ipp-9236/PYZhu/ICIP23/SwinT_cifar10/model/model_save/sparsity_0.9375').to(device)  
+		target_model= torch.load('YOUR PATH' + '/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/model/'+file_name).to(device)                #Your path, load the models
 		l = 0
 		target_model.eval()
-		# print(target_model)
-
 
 		for name, module in target_model.named_modules():
 			if type(module) == torch.nn.Conv2d or type(module) == torch.nn.Linear:
@@ -144,14 +131,6 @@ for root, dir_list, file_list in g:
 					layer_out_num = layer_out_num
 				else:
 					layer_out_num.append(module.weight.data.shape[0])
-
-
-
-		# for name, module in target_model.named_modules():
-		# 	if type(module) == torch.nn.GELU or type(module) == torch.nn.Identity:
-		# 		num_filter_layer[name] = layer_out_num[l]
-		# 		l += 1
-
 
 
 		hooks = {}
@@ -252,12 +231,8 @@ for root, dir_list, file_list in g:
 		test_acc, test_loss = test(target_model)
 
 
-
-		# np.savez('/home/ids/ipp-9236/PYZhu/NIPS23/VGG16_cifar10/RELU_modelntropy_lamda_sweep/lamda_0.1_1_counInfiEntro_doubleBeta10000/finetune_prun_model/lamda0.1/para_per_num/para_position_01/' +'entropy_num_per'+file_name ,                 #save the parameters
-		# 			layer_name=layer_name, layer_act_0_per=layer_act_0_per, layer_act_1_per = layer_act_1_per, 
-		# 			layer_act_0_num = layer_act_0_num, layer_act_1_num=layer_act_1_num,layer_act_mix_num=layer_act_mix_num,entorpy0_position=entorpy0_position)
-
-		np.savez('/home/ids/ipp-9236/PYZhu/ICIP23/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/para_per_num/para_position_01/' +'entropy_num_per'+file_name ,                 
+		#save the entropy file
+		np.savez('YOUR PATH' + '/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/para_per_num/para_position_01/' +'entropy_num_per'+file_name ,                             # set your own path to save the entropy file               
 					layer_name=layer_name, layer_act_0_per=layer_act_0_per, layer_act_1_per = layer_act_1_per, 
 					layer_act_0_num = layer_act_0_num, layer_act_1_num=layer_act_1_num,layer_act_mix_num=layer_act_mix_num,entorpy0_position=entorpy0_position)
 
@@ -285,26 +260,8 @@ for root, dir_list, file_list in g:
 
 
 
-		# fig = plt.figure(figsize= (20,10),dpi = 500)        
 
-		# p1 = plt.bar(layer_name, layer_act_0_num, width=0.4, color='darkorange', label='Nonlinear')    
-		# p2 = plt.bar(layer_name, layer_act_1_num, width=0.4, color='indianred', bottom=layer_act_0_num, label='linear')
-		# p3 = plt.bar(layer_name, layer_act_mix_num, width=0.4, color='royalblue', bottom=list(np.add(layer_act_0_num,layer_act_1_num)), label='mix')        
-		# # plt.title('number of neurons always linear/nonlinear with acc:'+ str(test_acc))                                                  
-		# plt.legend() 
-
-		# plt.legend(['OFF (H=0)', 'ON (H=0)', r'${H} \neq 0$'], fontsize=40) 
-		# plt.grid(True, linestyle='--', alpha=0.5)
-		# plt.xlabel("Layer", fontsize=30)
-		# plt.ylabel("Neurons", fontsize=30)
-		# plt.xticks([])
-		# plt.yticks(size=20)
-
-
-
-		plt.savefig('/home/ids/ipp-9236/PYZhu/ICIP23/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/para_per_num/fig/' +'entro_per_num'+ file_name  + '.pdf')            # save the bar plots for resnet model
-
-		# plt.savefig('/home/ids/ipp-9236/PYZhu/ICIP23/SwinT_cifar10/model/para_per_num_remove_ZeroLayer_LinerActi/fig/' +'entro_per_num' + '.pdf')
+		plt.savefig('YOUR PATH' + '/SwinT_TinyImagi/baseEntropyExpoMagni_prun/ReInitialize/para_per_num/fig/' +'entro_per_num'+ file_name  + '.pdf')                    # set your own path to save the histograms         # save the bar plots for resnet model
 
 
 
