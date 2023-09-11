@@ -37,7 +37,7 @@ reinitialize the EGP model of Swin-T trained on Cifar10 and finetune it.
 
 ## Calculate Entropy and generate histogram
 
-- 'Entropy_Histogram_Model_Dataset.py' is used to calculate the Entropy of ReLU/GeLU layers' input and generate teh histogram.
+- 'Entropy_Histogram_Model_Dataset.py' is used to calculate the Entropy of ReLU/GeLU layers' input and generate the histogram.
 
 For example:
 
@@ -45,4 +45,4 @@ For example:
 python Entropy_Histogram_Resnet18_cifar10.py
 ```
 
-calculate the entropy of ReLU layers' input in Resnet18 model trained on Cifar10 dataset.
+calculate the entropy of ReLU layers' input in Resnet18 model trained on Cifar10 dataset and generate the histogram.
