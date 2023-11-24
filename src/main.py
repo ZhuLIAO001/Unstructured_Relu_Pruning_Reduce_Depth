@@ -15,9 +15,6 @@ import os
 from torch.utils.data import DataLoader
 import argparse
 
-## Choose device
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
-device = torch.device("cuda:0")
 
 class Hook():
 	def __init__(self, module, backward=False):
