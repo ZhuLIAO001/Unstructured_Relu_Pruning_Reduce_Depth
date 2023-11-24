@@ -104,8 +104,6 @@ def test(model):
 
 
 
-layer_out_num = []
-
 
 
 results = []
@@ -116,13 +114,6 @@ num_filter_each_layer = {}
 target_model= torch.load('YOUR PATH' + '/SwinT_cifar10/ReInitialize/model/sparsity_0.9375').to(device)                                #Your path where save the model
 l = 0
 target_model.eval()
-
-for name, module in target_model.named_modules():
-	if type(module) == torch.nn.Conv2d or type(module) == torch.nn.Linear:
-		if 'downsample' in name:
-			layer_out_num = layer_out_num
-		else:
-			layer_out_num.append(module.weight.data.shape[0])
 
 
 

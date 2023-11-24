@@ -1,12 +1,8 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
-import torchvision.models as models
 from torch import nn
-from torch import optim
 import torch.nn.utils.prune as prune
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import copy
@@ -310,7 +306,7 @@ def main():
 		train_acc, train_loss = train(model, epoch,  args, train_loader)
 		test_acc, test_loss = test(model,  args, test_loader)
 		scheduler.step()
-		torch.save(model, 'models/'+ args.model+'_' + args.dataset+str(args.rho)+'/'+ 'sparsity_0')                   #set your own path to save model
+		torch.save(model, 'models/'+ args.model+'_' + args.dataset+'/'+ 'sparsity_0')                   #set your own path to save model
 
 	for i in range(1, 10):
 		sparsity = 1-(1-args.fixed_amount_of_pruning)**i
@@ -407,7 +403,7 @@ def main():
 		for name, module in temp_model.named_modules():
 			if name in layers_to_prune:
 				prune.remove(module,'weight')
-		torch.save(temp_model, 'models/'+ args.model+'_' + args.dataset+str(args.rho)+'/'+ 'sparsity_0')                   #set your own path to save model
+		torch.save(temp_model, 'models/'+ args.model+'_' + args.dataset+'/'+ 'sparsity_0')                   #set your own path to save model
 	
 
 
