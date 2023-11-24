@@ -54,8 +54,8 @@ class Hook():
 		else:
 			self.hook = module.register_backward_hook(self.hook_fn)													 
 	def hook_fn(self, module, input, output):
-		# self.output = output
-		self.output = torch.mean(torch.stack(list(input), dim=0),dim=0)    
+		self.output = input[0]
+		# self.output = torch.mean(torch.stack(list(input), dim=0),dim=0)    
 	def close(self):
 		self.hook.remove()
 

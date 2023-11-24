@@ -224,7 +224,6 @@ class BasicBlock_new(BasicBlock):
 		return out
 
 
-
 class ResNet_new(ResNet):
 	def __init__(self, *args, **kwargs):
 		super(ResNet_new, self).__init__(*args, **kwargs)		
