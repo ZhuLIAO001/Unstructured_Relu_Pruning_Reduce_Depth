@@ -102,15 +102,18 @@ def test_entropy(model, hooks, args, train_loader):
 
 			for key in hooks.keys():         # For different layers	
 
-				full_p_one = torch.heaviside(hooks[key].output , torch.tensor([0],dtype=torch.float32).to(device))
+				full_p_one = torch.heaviside(hooks[key].output , torch.tensor([0],dtype=torch.float32).to(args.device) )
 				p_one = torch.mean(full_p_one, dim=0)     
 				state = hooks[key].output > 0                                       
 				state = state.reshape(state.shape[0], state.shape[1], -1)                    
 				state_sum = torch.mean(state*1.0 , dim=[0,2])                         
 				state_sum_num = torch.sum((state_sum!= 0) * (state_sum!= 1))
 				if state_sum_num != 0:
-					while len(p_one.shape) > 1:					
-						p_one = torch.mean(p_one,dim=1)
+					while len(p_one.shape) > 1:		
+						if 	args.model == 'Resnet18':	
+							p_one = torch.mean(p_one,dim=1)
+						elif args.model == 'Swin-T':
+							p_one = torch.mean(p_one,dim=0)
 					p_one = (p_one*(state_sum!= 0) * (state_sum!= 1)*1.0)
 					entropy[key] -= torch.sum(p_one*torch.log2(torch.clamp(p_one, min=1e-5))+((1-p_one)*torch.log2(torch.clamp(1-p_one, min=1e-5))))/state_sum_num					
 				else:
@@ -145,7 +148,7 @@ def main():
 	parser.add_argument('--dev', default="cpu")
 	parser.add_argument('--seed', type=int, default=43, metavar='S',
 						help='random seed (default: 43)')
-	parser.add_argument('--datapath', default='data/')
+	parser.add_argument('--datapath', default='~/data/')
 	parser.add_argument('--model', default='Resnet18')
 	parser.add_argument('--dataset', default='cifar-10')
 	args = parser.parse_args()
