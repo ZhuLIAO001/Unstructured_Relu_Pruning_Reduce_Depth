@@ -94,7 +94,7 @@ def main():
 	parser.add_argument('--dev', default="cpu")
 	parser.add_argument('--seed', type=int, default=43, metavar='S',
 						help='random seed (default: 43)')
-	parser.add_argument('--datapath', default='data/')
+	parser.add_argument('--datapath', default='~/data/')
 	parser.add_argument('--model', default='Resnet18')
 	parser.add_argument('--dataset', default='cifar-10')
 	args = parser.parse_args()
