@@ -203,6 +203,7 @@ def main():
 
 			hooks = {}
 			if args.model == 'Resnet18':
+				replace_relu_inplace(model)
 				for name, module in model.named_modules():
 					replace_relu_inplace(model)
 					if type(module) == torch.nn.ReLU:
